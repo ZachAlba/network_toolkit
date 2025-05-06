@@ -1,0 +1,7 @@
+# Ignore logs generated
+*.txt
+*.log
+*.json
+*.csv
+*.xml
+*.tmp
