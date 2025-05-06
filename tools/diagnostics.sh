@@ -57,19 +57,19 @@ mkdir -p "$LOG_DIR"
   echo ""
 
   if command -v nc >/dev/null; then
-  echo "[+] Fast port scan using netcat..."
-  for PORT in 22 80 443 3306 5432 8080; do
-    nc -z -w1 "$HOST" $PORT && echo "Port $PORT open" || echo "Port $PORT closed"
-  done
-else
-  echo "[+] Fallback scan (slower)..."
-  for PORT in 22 80 443 3306 5432 8080; do
-    timeout 1 bash -c "echo > /dev/tcp/$HOST/$PORT" 2>/dev/null &&
-      echo "Port $PORT open" || echo "Port $PORT closed"
-  done
-fi
+    echo "[+] Fast port scan using netcat..."
+    for PORT in 22 80 443 3306 5432 8080; do
+      nc -z -w1 "$HOST" $PORT && echo "Port $PORT open" || echo "Port $PORT closed"
+    done
+  else
+    echo "[+] Fallback scan (slower)..."
+    for PORT in 22 80 443 3306 5432 8080; do
+      timeout 1 bash -c "echo > /dev/tcp/$HOST/$PORT" 2>/dev/null &&
+        echo "Port $PORT open" || echo "Port $PORT closed"
+    done
+  fi
   echo ""
 
-} >> "$OUTFILE"
+} >>"$OUTFILE"
 
 echo "Diagnostics complete. Report saved to: $OUTFILE"
