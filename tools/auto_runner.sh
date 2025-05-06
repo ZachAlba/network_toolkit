@@ -37,3 +37,14 @@ for HOST in $(echo "$HOSTS" | tr ',' ' '); do
 done
 
 echo "Batch scan complete."
+
+# Cleanup logs older than N days
+RETENTION_DAYS=$(grep '^log_retention_days' "$CONFIG_FILE" | cut -d= -f2 | tr -d ' ')
+
+if [[ "$RETENTION_DAYS" =~ ^[0-9]+$ ]]; then
+  echo "[*] Cleaning logs older than $RETENTION_DAYS days..."
+  find ./logs -maxdepth 1 -type d -name "20*" -mtime +$RETENTION_DAYS -exec rm -rf {} \;
+  echo "[*] Cleanup complete."
+else
+  echo "[!] Invalid or missing log_retention_days in config.ini — skipping cleanup."
+fi
