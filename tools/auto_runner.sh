@@ -48,3 +48,24 @@ if [[ "$RETENTION_DAYS" =~ ^[0-9]+$ ]]; then
 else
     echo "[!] Invalid or missing log_retention_days in config.ini — skipping cleanup."
 fi
+
+# Email alert logic
+EMAIL=$(grep '^admin_email' "$CONFIG_FILE" | cut -d= -f2 | tr -d ' ')
+
+ALERT_TMP=$(mktemp)
+bash "$(dirname "$0")/alerts.sh" >"$ALERT_TMP"
+
+if grep -q "ALERTS for host:" "$ALERT_TMP"; then
+    if command -v mail >/dev/null && [[ "$EMAIL" =~ "@" ]]; then
+        mail -s "Network Toolkit Alerts - $(date '+%Y-%m-%d')" "$EMAIL" <"$ALERT_TMP"
+        echo "[*] Alerts emailed to $EMAIL"
+    else
+        echo "[!] mail not installed or email not configured."
+        echo "Alerts output:"
+        cat "$ALERT_TMP"
+    fi
+else
+    echo "[*] No alerts detected."
+fi
+
+rm "$ALERT_TMP"
