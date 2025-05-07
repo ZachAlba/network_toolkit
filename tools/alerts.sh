@@ -59,7 +59,7 @@ for LOG in "${json_files[@]}"; do
             ALERTS+=("SSL certificate expires soon: $SSL_RAW")
         fi
     fi
-
+    
     # UDP port alerts
     if [[ "$UDP161" == "open" ]]; then
         ALERTS+=("SNMP port 161/udp is open — unexpected exposure")

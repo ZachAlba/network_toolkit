@@ -88,6 +88,14 @@ append_txt "Resolved IP: $DNS_RES"
 append_json "dns_lookup" "$DNS_RES"
 append_csv "dns_lookup" "$DNS_RES"
 
+# Reverse DNS lookup
+append_txt "\n[+] Reverse DNS Lookup"
+REVERSE_DNS=$(dig -x "$DNS_RES" +short | sed 's/\.$//' | head -n1)
+REVERSE_DNS=${REVERSE_DNS:-Not found}
+append_txt "Reverse DNS: $REVERSE_DNS"
+append_json "reverse_dns" "$REVERSE_DNS"
+append_csv "reverse_dns" "$REVERSE_DNS"
+
 # HTTP(S)
 append_txt "\n[+] HTTP(S) Status"
 HTTP_CODE=$(curl -Is --max-time 5 "http://$HOST" | head -n 1 | tr -d '\r\n')
