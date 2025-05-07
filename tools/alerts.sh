@@ -14,6 +14,7 @@ fi
 
 shopt -s nullglob
 json_files=("$LATEST_LOG_DIR"/*.json)
+json_files+=("$LATEST_LOG_DIR"/security_*.json)
 
 if [ ${#json_files[@]} -eq 0 ]; then
     echo "No JSON log files found in $LATEST_LOG_DIR."
@@ -108,6 +109,27 @@ for LOG in "${json_files[@]}"; do
     if [[ "$REDIRECT_COUNT" =~ ^[0-9]+$ ]] && [[ "$REDIRECT_COUNT" -gt 3 ]]; then
         ALERTS+=("Redirect chain length is high: $REDIRECT_COUNT redirects")
     fi
+
+    # Security scan results
+
+    # phpinfo and phpMyAdmin exposure
+    PHPINFO=$(get_json_value "phpinfo")
+    PHPMYADMIN=$(get_json_value "phpmyadmin")
+
+    [[ "$PHPINFO" == "exposed" ]] && ALERTS+=("phpinfo.php exposed — leaking PHP config")
+    [[ "$PHPMYADMIN" == "exposed" ]] && ALERTS+=("phpMyAdmin exposed — login panel detected")
+
+    # MySQL exposed over TCP
+    MYSQL=$(get_json_value "db_3306")
+    [[ "$MYSQL" == "open" ]] && ALERTS+=("MySQL port 3306 open — DB exposed over internet")
+
+    # Insecure headers
+    CSP=$(get_json_value "header_content_security_policy")
+    CORS=$(get_json_value "header_access_control_allow_origin")
+
+    [[ "$CSP" == "missing" ]] && ALERTS+=("Missing CSP header — no content policy enforcement")
+    [[ "$CORS" == "*" ]] && ALERTS+=("Permissive CORS: Access-Control-Allow-Origin is '*'")
+
 done
 
 echo "Alert scan complete."

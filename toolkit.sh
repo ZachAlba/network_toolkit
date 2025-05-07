@@ -47,6 +47,9 @@ handle_args() {
     diagnostics)
         bash tools/diagnostics.sh "$HOST" "--$OUTPUT"
         ;;
+    security)
+        bash tools/security_scan.sh "$HOST" "--$OUTPUT"
+        ;;
     auto)
         bash tools/auto_runner.sh
         ;;
@@ -68,9 +71,10 @@ interactive_flow() {
         echo "3) View recent logs"
         echo "4) View alerts"
         echo "5) Set config.ini values"
-        echo "6) Exit"
+        echo "6) Run security scan"
+        echo "7) Exit"
         echo
-        read -p "Enter your choice [1-6]: " CHOICE
+        read -p "Enter your choice [1-7]: " CHOICE
 
         case "$CHOICE" in
         1)
@@ -119,6 +123,27 @@ interactive_flow() {
             ;;
 
         6)
+            read -p "Enter host to scan: " HOST
+            echo "Output types:"
+            echo " 1) txt"
+            echo " 2) json"
+            echo " 3) csv"
+            echo " 4) all"
+            read -p "Select output format [1-4]: " OUTFMT
+            case "$OUTFMT" in
+            1) FLAG="--txt" ;;
+            2) FLAG="--json" ;;
+            3) FLAG="--csv" ;;
+            4) FLAG="--all" ;;
+            *)
+                echo "Invalid option"
+                continue
+                ;;
+            esac
+            bash tools/security_scan.sh "$HOST" "$FLAG"
+            ;;
+
+        7)
             echo "Goodbye."
             exit 0
             ;;
