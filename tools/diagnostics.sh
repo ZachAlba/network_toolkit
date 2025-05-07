@@ -28,9 +28,9 @@ json_output="{\n  \"host\": \"$HOST\",\n  \"timestamp\": \"$TIMESTAMP\",\n  \"re
 csv_output="timestamp,host,check_type,result\n"
 
 # Append helpers
-append_txt()   { txt_output+="$1"$'\n'; }
-append_json()  { json_output+="    \"$1\": \"$2\",\n"; }
-append_csv()   { csv_output+="$TIMESTAMP,$HOST,$1,$2\n"; }
+append_txt() { txt_output+="$1"$'\n'; }
+append_json() { json_output+="    \"$1\": \"$2\",\n"; }
+append_csv() { csv_output+="$TIMESTAMP,$HOST,$1,$2\n"; }
 
 # ----------------------
 # Begin Diagnostics
@@ -65,7 +65,7 @@ append_csv "dns" "$DNS"
 
 # Ping
 append_txt "\n[+] Ping"
-ping -c 4 "$HOST" > /dev/null 2>&1 && PING_RESULT="success" || PING_RESULT="failure"
+ping -c 4 "$HOST" >/dev/null 2>&1 && PING_RESULT="success" || PING_RESULT="failure"
 append_txt "Ping result: $PING_RESULT"
 append_json "ping" "$PING_RESULT"
 append_csv "ping" "$PING_RESULT"
@@ -143,7 +143,6 @@ else
   done
 fi
 
-
 # ----------------------
 # Write Output
 # ----------------------
@@ -152,9 +151,9 @@ fi
 json_output="${json_output%}"
 json_output+="\n  }\n}"
 
-[[ "$FLAG" == "--txt" || "$FLAG" == "--all" ]] && echo "$txt_output" > "$TXT_OUT"
-[[ "$FLAG" == "--json" || "$FLAG" == "--all" ]] && echo -e "$json_output" > "$JSON_OUT"
-[[ "$FLAG" == "--csv" || "$FLAG" == "--all" ]] && echo "$csv_output" > "$CSV_OUT"
+[[ "$FLAG" == "--txt" || "$FLAG" == "--all" ]] && echo "$txt_output" >"$TXT_OUT"
+[[ "$FLAG" == "--json" || "$FLAG" == "--all" ]] && echo -e "$json_output" >"$JSON_OUT"
+[[ "$FLAG" == "--csv" || "$FLAG" == "--all" ]] && echo "$csv_output" >"$CSV_OUT"
 
 echo "Diagnostics complete. Output saved to:"
 [[ "$FLAG" == "--txt" || "$FLAG" == "--all" ]] && echo "  - $TXT_OUT"
