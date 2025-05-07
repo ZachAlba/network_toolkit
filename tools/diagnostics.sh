@@ -115,6 +115,54 @@ append_txt "SSL expires: $SSL_EXPIRY"
 append_json "ssl_expiry" "$SSL_EXPIRY"
 append_csv "ssl_expiry" "$SSL_EXPIRY"
 
+# SSL advanced checks
+append_txt "\n[+] SSL Certificate Analysis"
+
+SSL_INFO=$(echo | openssl s_client -servername "$HOST" -connect "$HOST:443" 2>/dev/null)
+
+# Subject CN
+SSL_SUBJECT=$(echo "$SSL_INFO" | openssl x509 -noout -subject | sed 's/subject= //')
+SSL_CN=$(echo "$SSL_SUBJECT" | sed -n 's/.*CN=\([^,]*\).*/\1/p')
+
+# Issuer
+SSL_ISSUER=$(echo "$SSL_INFO" | openssl x509 -noout -issuer | sed 's/issuer= //')
+
+# Signature algorithm
+SSL_SIGALG=$(echo "$SSL_INFO" | openssl x509 -noout -text | grep "Signature Algorithm" | head -n1 | awk -F': ' '{print $2}')
+
+# Mismatch
+if [[ "$SSL_CN" != "$HOST" && "$SSL_CN" != *".$(echo "$HOST" | cut -d. -f2-)" ]]; then
+  append_txt "Domain mismatch: cert CN = $SSL_CN"
+  append_json "ssl_cn_mismatch" "true"
+  append_csv "ssl_cn_mismatch" "true"
+else
+  append_txt "Domain matches CN: $SSL_CN"
+  append_json "ssl_cn_mismatch" "false"
+  append_csv "ssl_cn_mismatch" "false"
+fi
+
+# Self-signed detection
+if [[ "$SSL_ISSUER" == *"$SSL_CN"* ]]; then
+  append_txt "Self-signed certificate detected"
+  append_json "ssl_self_signed" "true"
+  append_csv "ssl_self_signed" "true"
+else
+  append_txt "Issuer: $SSL_ISSUER"
+  append_json "ssl_self_signed" "false"
+  append_csv "ssl_self_signed" "false"
+fi
+
+# Weak sig alg
+if [[ "$SSL_SIGALG" == *"sha1"* || "$SSL_SIGALG" == *"md5"* ]]; then
+  append_txt "Weak signature algorithm: $SSL_SIGALG"
+  append_json "ssl_sig_weak" "true"
+  append_csv "ssl_sig_weak" "true"
+else
+  append_txt "Signature Algorithm: $SSL_SIGALG"
+  append_json "ssl_sig_weak" "false"
+  append_csv "ssl_sig_weak" "false"
+fi
+
 # Port scan
 append_txt "\n[+] Port Scan"
 PORTS=(22 80 443 3306 5432 8080)

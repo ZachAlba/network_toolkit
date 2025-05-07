@@ -59,7 +59,16 @@ for LOG in "${json_files[@]}"; do
             ALERTS+=("SSL certificate expires soon: $SSL_RAW")
         fi
     fi
-    
+
+    # SSL alerts
+    SSL_CN_MISMATCH=$(get_json_value "ssl_cn_mismatch")
+    SSL_SELF_SIGNED=$(get_json_value "ssl_self_signed")
+    SSL_SIG_WEAK=$(get_json_value "ssl_sig_weak")
+
+    [[ "$SSL_CN_MISMATCH" == "true" ]] && ALERTS+=("SSL domain mismatch (CN)")
+    [[ "$SSL_SELF_SIGNED" == "true" ]] && ALERTS+=("Self-signed certificate")
+    [[ "$SSL_SIG_WEAK" == "true" ]] && ALERTS+=("Weak signature algorithm")
+
     # UDP port alerts
     if [[ "$UDP161" == "open" ]]; then
         ALERTS+=("SNMP port 161/udp is open — unexpected exposure")
