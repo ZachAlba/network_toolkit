@@ -108,6 +108,27 @@ append_json "https_status" "$HTTPS_CODE"
 append_csv "http_status" "$HTTP_CODE"
 append_csv "https_status" "$HTTPS_CODE"
 
+# HTTP content check
+append_txt "\n[+] HTTP Content Check"
+HTTP_BODY=$(curl -sL --max-redirs 5 --max-time 5 "http://$HOST")
+
+if echo "$HTTP_BODY" | grep -qiE 'welcome|nginx|apache|html'; then
+  CONTENT_MATCH="yes"
+else
+  CONTENT_MATCH="no"
+fi
+
+REDIRECT_COUNT=$(curl -sIL --max-redirs 10 -o /dev/null -w '%{num_redirects}' "http://$HOST")
+
+append_txt "Keyword match: $CONTENT_MATCH"
+append_txt "Redirect chain length: $REDIRECT_COUNT"
+
+append_json "http_keyword_match" "$CONTENT_MATCH"
+append_json "http_redirects" "$REDIRECT_COUNT"
+
+append_csv "http_keyword_match" "$CONTENT_MATCH"
+append_csv "http_redirects" "$REDIRECT_COUNT"
+
 # SSL expiry
 append_txt "\n[+] SSL Certificate Expiry"
 SSL_EXPIRY=$(echo | openssl s_client -servername "$HOST" -connect "$HOST:443" 2>/dev/null | openssl x509 -noout -enddate | cut -d= -f2)

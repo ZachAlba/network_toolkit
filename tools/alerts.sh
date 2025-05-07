@@ -87,6 +87,16 @@ for LOG in "${json_files[@]}"; do
         done
         echo
     fi
+
+      # HTTP content validation
+    KEYWORD_MATCH=$(get_json_value "http_keyword_match")
+    REDIRECT_COUNT=$(get_json_value "http_redirects")
+
+    [[ "$KEYWORD_MATCH" == "no" ]] && ALERTS+=("Expected keywords not found in HTTP body")
+    
+    if [[ "$REDIRECT_COUNT" =~ ^[0-9]+$ ]] && [[ "$REDIRECT_COUNT" -gt 3 ]]; then
+        ALERTS+=("Redirect chain length is high: $REDIRECT_COUNT redirects")
+    fi
 done
 
 echo "Alert scan complete."
