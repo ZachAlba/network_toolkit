@@ -45,6 +45,17 @@ for LOG in "${json_files[@]}"; do
 
     # Standard alerts
     [[ "$PING" != "success" ]] && ALERTS+=("Ping failed")
+    LOSS=$(get_json_value "ping_packet_loss")
+    RTT=$(get_json_value "ping_avg_rtt")
+
+    if [[ "$LOSS" =~ ^[0-9]+$ && "$LOSS" -gt 0 ]]; then
+        ALERTS+=("Packet loss detected: $LOSS%")
+    fi
+
+    if [[ "$RTT" =~ ^[0-9]+$ && "$RTT" -gt 100 ]]; then
+        ALERTS+=("High average ping RTT: ${RTT}ms")
+    fi
+
     [[ "$PORT80" == "closed" ]] && ALERTS+=("Port 80 closed")
     [[ "$PORT443" == "closed" ]] && ALERTS+=("Port 443 closed")
     [[ ! "$HTTP_STATUS" =~ 200 ]] && ALERTS+=("Non-200 HTTP status: $HTTP_STATUS")
@@ -88,12 +99,12 @@ for LOG in "${json_files[@]}"; do
         echo
     fi
 
-      # HTTP content validation
+    # HTTP content validation
     KEYWORD_MATCH=$(get_json_value "http_keyword_match")
     REDIRECT_COUNT=$(get_json_value "http_redirects")
 
     [[ "$KEYWORD_MATCH" == "no" ]] && ALERTS+=("Expected keywords not found in HTTP body")
-    
+
     if [[ "$REDIRECT_COUNT" =~ ^[0-9]+$ ]] && [[ "$REDIRECT_COUNT" -gt 3 ]]; then
         ALERTS+=("Redirect chain length is high: $REDIRECT_COUNT redirects")
     fi

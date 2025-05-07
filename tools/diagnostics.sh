@@ -63,12 +63,31 @@ append_csv "public_ip" "$PUBLIC_IP"
 append_csv "gateway" "$GATEWAY"
 append_csv "dns" "$DNS"
 
-# Ping
+# Ping metrics
 append_txt "\n[+] Ping"
-ping -c 4 "$HOST" >/dev/null 2>&1 && PING_RESULT="success" || PING_RESULT="failure"
+
+PING_RAW=$(ping -c 4 "$HOST" 2>&1)
+if echo "$PING_RAW" | grep -q "0 received"; then
+  PING_RESULT="failure"
+  PACKET_LOSS="100"
+  AVG_RTT="0"
+else
+  PING_RESULT="success"
+  PACKET_LOSS=$(echo "$PING_RAW" | grep -oP '\d+(?=% packet loss)')
+  AVG_RTT=$(echo "$PING_RAW" | grep 'rtt' | cut -d'=' -f2 | cut -d'/' -f2 | awk '{print int($1)}')
+fi
+
 append_txt "Ping result: $PING_RESULT"
+append_txt "Packet loss: ${PACKET_LOSS}%"
+append_txt "Avg RTT: ${AVG_RTT}ms"
+
 append_json "ping" "$PING_RESULT"
+append_json "ping_packet_loss" "$PACKET_LOSS"
+append_json "ping_avg_rtt" "$AVG_RTT"
+
 append_csv "ping" "$PING_RESULT"
+append_csv "ping_packet_loss" "$PACKET_LOSS%"
+append_csv "ping_avg_rtt" "${AVG_RTT}ms"
 
 # Traceroute (first 5 lines)
 append_txt "\n[+] Traceroute"
