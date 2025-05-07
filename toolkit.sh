@@ -12,10 +12,11 @@ show_menu() {
     echo "1) Run manual diagnostics"
     echo "2) Run auto mode (batch scan from config.ini)"
     echo "3) View recent logs"
-    echo "4) Set config.ini values"
-    echo "5) Exit"
+    echo "4) View alerts"
+    echo "5) Set config.ini values"
+    echo "6) Exit"
     echo
-    read -p "Enter your choice [1-4]: " CHOICE
+    read -p "Enter your choice [1-6]: " CHOICE
 }
 
 handle_args() {
@@ -59,7 +60,18 @@ handle_args() {
 
 interactive_flow() {
     while true; do
-        show_menu
+        echo "==============================="
+        echo " Network Diagnostic Toolkit"
+        echo "==============================="
+        echo "1) Run manual diagnostics"
+        echo "2) Run auto mode (batch scan from config.ini)"
+        echo "3) View recent logs"
+        echo "4) View alerts"
+        echo "5) Set config.ini values"
+        echo "6) Exit"
+        echo
+        read -p "Enter your choice [1-6]: " CHOICE
+
         case "$CHOICE" in
         1)
             read -p "Enter host to scan: " HOST
@@ -81,19 +93,38 @@ interactive_flow() {
             esac
             bash tools/diagnostics.sh "$HOST" "$FLAG"
             ;;
+
         2)
             bash tools/auto_runner.sh
             ;;
+
         3)
-            echo "Showing recent logs..."
-            find logs -type f | tail -n 10
+            echo "Recent log files:"
+            find logs -mindepth 2 -type f \( -name "*.txt" -o -name "*.json" -o -name "*.csv" \) | sort | tail -n 10
             ;;
+
         4)
+            bash tools/alerts.sh
+            ;;
+
+        5)
+            echo "Updating config.ini..."
+            read -p "Enter comma-separated hosts (e.g. google.com,1.1.1.1): " HOSTS
+            read -p "Choose output format [txt/json/csv/all]: " MODE
+            read -p "Set log retention in days: " DAYS
+            read -p "Set admin email for alerts: " EMAIL
+
+            echo -e "[Targets]\nhosts = $HOSTS\n\n[Settings]\noutput_mode = $MODE\nlog_retention_days = $DAYS\n\n[Admin]\nadmin_email = $EMAIL" >config.ini
+            echo "config.ini updated successfully."
+            ;;
+
+        6)
             echo "Goodbye."
             exit 0
             ;;
+
         *)
-            echo "Invalid selection. Try again."
+            echo "Invalid selection. Please choose 1-6."
             ;;
         esac
         echo
