@@ -121,6 +121,29 @@ for PORT in "${PORTS[@]}"; do
   append_csv "port_$PORT" "$STATE"
 done
 
+append_txt "\n[+] UDP Port Scan (53 DNS, 123 NTP, 161 SNMP)"
+
+UDP_PORTS=(53 123 161)
+UDP_RESULTS=()
+
+if command -v nmap >/dev/null; then
+  NMAP_UDP_OUT=$(nmap -sU -p 53,123,161 --open --reason --max-retries 1 --host-timeout 10s "$HOST" 2>/dev/null)
+  for PORT in "${UDP_PORTS[@]}"; do
+    STATUS=$(echo "$NMAP_UDP_OUT" | awk "/$PORT\/udp/"'{print $2}')
+    [ -z "$STATUS" ] && STATUS="filtered"
+    append_txt "UDP port $PORT: $STATUS"
+    append_json "udp_port_$PORT" "$STATUS"
+    append_csv "udp_port_$PORT" "$STATUS"
+  done
+else
+  append_txt "nmap not available — skipping UDP scan."
+  for PORT in "${UDP_PORTS[@]}"; do
+    append_json "udp_port_$PORT" "skipped"
+    append_csv "udp_port_$PORT" "skipped"
+  done
+fi
+
+
 # ----------------------
 # Write Output
 # ----------------------
