@@ -94,6 +94,21 @@ for LOG in "${sec_jsons[@]}"; do
     MYSQL=$(get_json_value "db_3306" "$JSON")
     CSP=$(get_json_value "header_content_security_policy" "$JSON")
     CORS=$(get_json_value "header_access_control_allow_origin" "$JSON")
+    SSL_RAW=$(get_json_value "ssl_expiry" "$JSON")
+    SSL_CN_MISMATCH=$(get_json_value "ssl_cn_mismatch" "$JSON")
+    SSL_SELF_SIGNED=$(get_json_value "ssl_self_signed" "$JSON")
+    SSL_SIG_WEAK=$(get_json_value "ssl_sig_weak" "$JSON")
+
+    if [[ -n "$SSL_RAW" ]]; then
+        SSL_EPOCH=$(date -d "$SSL_RAW" +%s 2>/dev/null)
+        NOW_EPOCH=$(date +%s)
+        SEVEN_DAYS=$((60 * 60 * 24 * 7))
+        [[ "$SSL_EPOCH" -lt $((NOW_EPOCH + SEVEN_DAYS)) ]] && ALERTS+=("SSL certificate expires soon: $SSL_RAW")
+    fi
+
+    [[ "$SSL_CN_MISMATCH" == "true" ]] && ALERTS+=("SSL domain mismatch (CN)")
+    [[ "$SSL_SELF_SIGNED" == "true" ]] && ALERTS+=("Self-signed certificate")
+    [[ "$SSL_SIG_WEAK" == "true" ]] && ALERTS+=("Weak signature algorithm")
 
     [[ "$PHPINFO" == "exposed" ]] && ALERTS+=("phpinfo.php exposed — leaking PHP config")
     [[ "$PHPMYADMIN" == "exposed" ]] && ALERTS+=("phpMyAdmin exposed — login panel detected")

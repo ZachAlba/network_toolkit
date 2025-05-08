@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================
-# Network Diagnostic Toolkit
+# Diagnostics - Network Toolkit
 # Author: Zachary Albanese
 # =============================
 
@@ -16,112 +16,50 @@ TXT_OUT="$LOG_DIR/$BASENAME.txt"
 JSON_OUT="$LOG_DIR/$BASENAME.json"
 CSV_OUT="$LOG_DIR/$BASENAME.csv"
 
-# Fail if no host
 if [ -z "$HOST" ]; then
   echo "Usage: $0 <host> [--txt|--json|--csv|--all]"
   exit 1
 fi
 
-# Buffers
 txt_output=""
 json_output="{\n  \"host\": \"$HOST\",\n  \"timestamp\": \"$TIMESTAMP\",\n  \"results\": {\n"
 csv_output="timestamp,host,check_type,result\n"
 
-# Append helpers
 append_txt() { txt_output+="$1"$'\n'; }
-append_json() { json_output+="    \"$1\": \"$2\",\n"; }
+append_json() {
+  local key="$1"
+  local val="$2"
+  val=$(echo "$val" | sed 's/"/\\"/g' | tr -d '\r')
+  json_output+="    \"${key}\": \"${val}\",\n"
+}
 append_csv() { csv_output+="$TIMESTAMP,$HOST,$1,$2\n"; }
 
-# ----------------------
-# Begin Diagnostics
-# ----------------------
-
-append_txt "===== Network Diagnostic Report ====="
-append_txt "Target: $HOST"
-append_txt "Generated: $(date)"
-append_txt "====================================="
-
-# Local system info
-LOCAL_IP=$(hostname -I | awk '{print $1}')
-PUBLIC_IP=$(curl -s ifconfig.me)
-GATEWAY=$(ip route | grep default | awk '{print $3}')
-DNS=$(grep 'nameserver' /etc/resolv.conf | awk '{print $2}' | paste -sd ',' -)
-
-append_txt "\n[+] System Info"
-append_txt "Local IP: $LOCAL_IP"
-append_txt "Public IP: $PUBLIC_IP"
-append_txt "Gateway: $GATEWAY"
-append_txt "DNS: $DNS"
-
-append_json "local_ip" "$LOCAL_IP"
-append_json "public_ip" "$PUBLIC_IP"
-append_json "gateway" "$GATEWAY"
-append_json "dns" "$DNS"
-
-append_csv "local_ip" "$LOCAL_IP"
-append_csv "public_ip" "$PUBLIC_IP"
-append_csv "gateway" "$GATEWAY"
-append_csv "dns" "$DNS"
-
-# Ping metrics
-append_txt "\n[+] Ping"
-
-PING_RAW=$(ping -c 4 "$HOST" 2>&1)
-if echo "$PING_RAW" | grep -q "0 received"; then
-  PING_RESULT="failure"
-  PACKET_LOSS="100"
-  AVG_RTT="0"
+# Ping
+append_txt "[+] Ping Test"
+ping_result=$(ping -c 3 -W 2 "$HOST")
+if [[ $? -eq 0 ]]; then
+  append_txt "Ping: success"
+  append_json "ping" "success"
 else
-  PING_RESULT="success"
-  PACKET_LOSS=$(echo "$PING_RAW" | grep -oP '\d+(?=% packet loss)')
-  AVG_RTT=$(echo "$PING_RAW" | grep 'rtt' | cut -d'=' -f2 | cut -d'/' -f2 | awk '{print int($1)}')
+  append_txt "Ping: failed"
+  append_json "ping" "failed"
 fi
 
-append_txt "Ping result: $PING_RESULT"
-append_txt "Packet loss: ${PACKET_LOSS}%"
-append_txt "Avg RTT: ${AVG_RTT}ms"
+LOSS=$(echo "$ping_result" | grep -oP '\d+(?=% packet loss)')
+RTT=$(echo "$ping_result" | awk -F'/' '/rtt/ {print $5}')
 
-append_json "ping" "$PING_RESULT"
-append_json "ping_packet_loss" "$PACKET_LOSS"
-append_json "ping_avg_rtt" "$AVG_RTT"
+append_json "ping_packet_loss" "${LOSS:-0}"
+append_json "ping_avg_rtt" "${RTT:-0}"
+append_csv "ping_packet_loss" "${LOSS:-0}"
+append_csv "ping_avg_rtt" "${RTT:-0}"
 
-append_csv "ping" "$PING_RESULT"
-append_csv "ping_packet_loss" "$PACKET_LOSS%"
-append_csv "ping_avg_rtt" "${AVG_RTT}ms"
+# HTTP status check
+append_txt "\n[+] HTTP/HTTPS Status"
+HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://$HOST")
+HTTPS_CODE=$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST")
 
-# Traceroute (first 5 lines)
-append_txt "\n[+] Traceroute"
-TRACEROUTE=$(traceroute -m 10 "$HOST" 2>&1 | head -n 5 | tr '\n' ';')
-append_txt "$TRACEROUTE"
-append_json "traceroute" "$TRACEROUTE"
-append_csv "traceroute" "truncated"
-
-# DNS lookup
-append_txt "\n[+] DNS Lookup"
-if command -v nslookup >/dev/null; then
-  DNS_RES=$(nslookup "$HOST" | grep 'Address' | tail -n1 | awk '{print $2}')
-else
-  DNS_RES=$(dig +short "$HOST" | head -n1)
-fi
-append_txt "Resolved IP: $DNS_RES"
-append_json "dns_lookup" "$DNS_RES"
-append_csv "dns_lookup" "$DNS_RES"
-
-# Reverse DNS lookup
-append_txt "\n[+] Reverse DNS Lookup"
-REVERSE_DNS=$(dig -x "$DNS_RES" +short | sed 's/\.$//' | head -n1)
-REVERSE_DNS=${REVERSE_DNS:-Not found}
-append_txt "Reverse DNS: $REVERSE_DNS"
-append_json "reverse_dns" "$REVERSE_DNS"
-append_csv "reverse_dns" "$REVERSE_DNS"
-
-# HTTP(S)
-append_txt "\n[+] HTTP(S) Status"
-HTTP_CODE=$(curl -Is --max-time 5 "http://$HOST" | head -n 1 | tr -d '\r\n')
-HTTPS_CODE=$(curl -Is --max-time 5 "https://$HOST" | head -n 1 | tr -d '\r\n')
-
-append_txt "HTTP: $HTTP_CODE"
-append_txt "HTTPS: $HTTPS_CODE"
+append_txt "HTTP status: $HTTP_CODE"
+append_txt "HTTPS status: $HTTPS_CODE"
 append_json "http_status" "$HTTP_CODE"
 append_json "https_status" "$HTTPS_CODE"
 append_csv "http_status" "$HTTP_CODE"
@@ -144,64 +82,8 @@ append_txt "Redirect chain length: $REDIRECT_COUNT"
 
 append_json "http_keyword_match" "$CONTENT_MATCH"
 append_json "http_redirects" "$REDIRECT_COUNT"
-
 append_csv "http_keyword_match" "$CONTENT_MATCH"
 append_csv "http_redirects" "$REDIRECT_COUNT"
-
-# SSL expiry
-append_txt "\n[+] SSL Certificate Expiry"
-SSL_EXPIRY=$(echo | openssl s_client -servername "$HOST" -connect "$HOST:443" 2>/dev/null | openssl x509 -noout -enddate | cut -d= -f2)
-append_txt "SSL expires: $SSL_EXPIRY"
-append_json "ssl_expiry" "$SSL_EXPIRY"
-append_csv "ssl_expiry" "$SSL_EXPIRY"
-
-# SSL advanced checks
-append_txt "\n[+] SSL Certificate Analysis"
-
-SSL_INFO=$(echo | openssl s_client -servername "$HOST" -connect "$HOST:443" 2>/dev/null)
-
-# Subject CN
-SSL_SUBJECT=$(echo "$SSL_INFO" | openssl x509 -noout -subject | sed 's/subject= //')
-SSL_CN=$(echo "$SSL_SUBJECT" | sed -n 's/.*CN=\([^,]*\).*/\1/p')
-
-# Issuer
-SSL_ISSUER=$(echo "$SSL_INFO" | openssl x509 -noout -issuer | sed 's/issuer= //')
-
-# Signature algorithm
-SSL_SIGALG=$(echo "$SSL_INFO" | openssl x509 -noout -text | grep "Signature Algorithm" | head -n1 | awk -F': ' '{print $2}')
-
-# Mismatch
-if [[ "$SSL_CN" != "$HOST" && "$SSL_CN" != *".$(echo "$HOST" | cut -d. -f2-)" ]]; then
-  append_txt "Domain mismatch: cert CN = $SSL_CN"
-  append_json "ssl_cn_mismatch" "true"
-  append_csv "ssl_cn_mismatch" "true"
-else
-  append_txt "Domain matches CN: $SSL_CN"
-  append_json "ssl_cn_mismatch" "false"
-  append_csv "ssl_cn_mismatch" "false"
-fi
-
-# Self-signed detection
-if [[ "$SSL_ISSUER" == *"$SSL_CN"* ]]; then
-  append_txt "Self-signed certificate detected"
-  append_json "ssl_self_signed" "true"
-  append_csv "ssl_self_signed" "true"
-else
-  append_txt "Issuer: $SSL_ISSUER"
-  append_json "ssl_self_signed" "false"
-  append_csv "ssl_self_signed" "false"
-fi
-
-# Weak sig alg
-if [[ "$SSL_SIGALG" == *"sha1"* || "$SSL_SIGALG" == *"md5"* ]]; then
-  append_txt "Weak signature algorithm: $SSL_SIGALG"
-  append_json "ssl_sig_weak" "true"
-  append_csv "ssl_sig_weak" "true"
-else
-  append_txt "Signature Algorithm: $SSL_SIGALG"
-  append_json "ssl_sig_weak" "false"
-  append_csv "ssl_sig_weak" "false"
-fi
 
 # Port scan
 append_txt "\n[+] Port Scan"
@@ -225,7 +107,7 @@ UDP_RESULTS=()
 if command -v nmap >/dev/null; then
   NMAP_UDP_OUT=$(nmap -sU -p 53,123,161 --open --reason --max-retries 1 --host-timeout 10s "$HOST" 2>/dev/null)
   for PORT in "${UDP_PORTS[@]}"; do
-    STATUS=$(echo "$NMAP_UDP_OUT" | awk "/$PORT\/udp/"'{print $2}')
+    STATUS=$(echo "$NMAP_UDP_OUT" | awk "/$PORT\\/udp/"'{print $2}')
     [ -z "$STATUS" ] && STATUS="filtered"
     append_txt "UDP port $PORT: $STATUS"
     append_json "udp_port_$PORT" "$STATUS"
