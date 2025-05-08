@@ -26,7 +26,13 @@ json_output="{\n  \"host\": \"$HOST\",\n  \"timestamp\": \"$TIMESTAMP\",\n  \"re
 csv_output="timestamp,host,check_type,result\n"
 
 append_txt() { txt_output+="$1"$'\n'; }
-append_json() { json_output+="    \"$1\": \"$2\",\n"; }
+append_json() {
+  local key="$1"
+  local val="$2"
+  val=$(echo "$val" | sed 's/"/\\"/g' | tr -d '\r') # escape quotes + CR
+  json_output+="    \"${key}\": \"${val}\",\n"
+}
+
 append_csv() { csv_output+="$TIMESTAMP,$HOST,$1,$2\n"; }
 
 # -------- Banner Grabs --------
@@ -100,8 +106,10 @@ append_csv "phpmyadmin" "$PMA"
 
 # -------- Output --------
 
-json_output="${json_output%?}" # remove trailing comma
+# Remove trailing comma
+json_output=$(echo -e "$json_output" | sed '$s/,\s*$//')
 json_output+="\n  }\n}"
+
 
 [[ "$FLAG" == "--txt" || "$FLAG" == "--all" ]] && echo "$txt_output" >"$TXT_OUT"
 [[ "$FLAG" == "--json" || "$FLAG" == "--all" ]] && echo -e "$json_output" >"$JSON_OUT"
