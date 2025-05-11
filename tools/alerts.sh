@@ -1,5 +1,19 @@
 #!/bin/bash
 
+# ---- Terminal Colors ----
+RED='\033[1;31m'
+GREEN='\033[1;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[1;36m'
+RESET='\033[0m'
+
+# Enable only if interactive terminal
+if [[ -t 1 ]]; then
+    USE_COLOR=true
+else
+    USE_COLOR=false
+fi
+
 # =============================
 # Network Diagnostic Toolkit - Alerts
 # Author: Zachary Albanese
@@ -21,7 +35,7 @@ if [ ${#diag_jsons[@]} -eq 0 ] && [ ${#sec_jsons[@]} -eq 0 ]; then
     exit 0
 fi
 
-echo "Scanning logs in: $LATEST_LOG_DIR"
+[[ $USE_COLOR == true ]] && echo -e "${GREEN}Scanning logs in: $LATEST_LOG_DIR${RESET}" || echo "Scanning logs in: $LATEST_LOG_DIR"
 echo
 
 # Extract key-value from JSON
@@ -40,10 +54,6 @@ for LOG in "${diag_jsons[@]}"; do
     RTT=$(get_json_value "ping_avg_rtt" "$JSON")
     HTTP_STATUS=$(get_json_value "http_status" "$JSON")
     HTTPS_STATUS=$(get_json_value "https_status" "$JSON")
-    SSL_RAW=$(get_json_value "ssl_expiry" "$JSON")
-    SSL_CN_MISMATCH=$(get_json_value "ssl_cn_mismatch" "$JSON")
-    SSL_SELF_SIGNED=$(get_json_value "ssl_self_signed" "$JSON")
-    SSL_SIG_WEAK=$(get_json_value "ssl_sig_weak" "$JSON")
     UDP53=$(get_json_value "udp_port_53" "$JSON")
     UDP123=$(get_json_value "udp_port_123" "$JSON")
     UDP161=$(get_json_value "udp_port_161" "$JSON")
@@ -59,25 +69,14 @@ for LOG in "${diag_jsons[@]}"; do
     [[ ! "$HTTP_STATUS" =~ 200 ]] && ALERTS+=("Non-200 HTTP status: $HTTP_STATUS")
     [[ ! "$HTTPS_STATUS" =~ 200 ]] && ALERTS+=("Non-200 HTTPS status: $HTTPS_STATUS")
 
-    if [[ -n "$SSL_RAW" ]]; then
-        SSL_EPOCH=$(date -d "$SSL_RAW" +%s 2>/dev/null)
-        NOW_EPOCH=$(date +%s)
-        SEVEN_DAYS=$((60 * 60 * 24 * 7))
-        [[ "$SSL_EPOCH" -lt $((NOW_EPOCH + SEVEN_DAYS)) ]] && ALERTS+=("SSL certificate expires soon: $SSL_RAW")
-    fi
-
-    [[ "$SSL_CN_MISMATCH" == "true" ]] && ALERTS+=("SSL domain mismatch (CN)")
-    [[ "$SSL_SELF_SIGNED" == "true" ]] && ALERTS+=("Self-signed certificate")
-    [[ "$SSL_SIG_WEAK" == "true" ]] && ALERTS+=("Weak signature algorithm")
-
     [[ "$UDP161" == "open" ]] && ALERTS+=("SNMP port 161/udp is open — unexpected exposure")
     [[ "$UDP53" != "open" && "$UDP53" != "skipped" ]] && ALERTS+=("DNS port 53/udp not open — DNS may be blocked")
     [[ "$UDP123" != "open" && "$UDP123" != "skipped" ]] && ALERTS+=("NTP port 123/udp not open — time sync may fail")
 
     [[ ${#ALERTS[@]} -gt 0 ]] && {
-        echo "ALERTS (Diagnostics) for host: $HOST"
+        [[ $USE_COLOR == true ]] && echo -e "${CYAN}ALERTS (Diagnostics) for host: $HOST${RESET}" || echo "ALERTS (Diagnostics) for host: $HOST"
         for alert in "${ALERTS[@]}"; do
-            echo "  - $alert"
+            [[ $USE_COLOR == true ]] && echo -e "  ${YELLOW}- $alert${RESET}" || echo "  - $alert"
         done
         echo
     }
@@ -94,6 +93,8 @@ for LOG in "${sec_jsons[@]}"; do
     MYSQL=$(get_json_value "db_3306" "$JSON")
     CSP=$(get_json_value "header_content_security_policy" "$JSON")
     CORS=$(get_json_value "header_access_control_allow_origin" "$JSON")
+    COOKIE_FLAGS=$(get_json_value "cookie_flags" "$JSON")
+    WAF_DETECTED=$(get_json_value "waf_detected" "$JSON")
     SSL_RAW=$(get_json_value "ssl_expiry" "$JSON")
     SSL_CN_MISMATCH=$(get_json_value "ssl_cn_mismatch" "$JSON")
     SSL_SELF_SIGNED=$(get_json_value "ssl_self_signed" "$JSON")
@@ -109,21 +110,27 @@ for LOG in "${sec_jsons[@]}"; do
     [[ "$SSL_CN_MISMATCH" == "true" ]] && ALERTS+=("SSL domain mismatch (CN)")
     [[ "$SSL_SELF_SIGNED" == "true" ]] && ALERTS+=("Self-signed certificate")
     [[ "$SSL_SIG_WEAK" == "true" ]] && ALERTS+=("Weak signature algorithm")
-
     [[ "$PHPINFO" == "exposed" ]] && ALERTS+=("phpinfo.php exposed — leaking PHP config")
     [[ "$PHPMYADMIN" == "exposed" ]] && ALERTS+=("phpMyAdmin exposed — login panel detected")
     [[ "$MYSQL" == "open" ]] && ALERTS+=("MySQL port 3306 open — DB exposed over internet")
     [[ "$CSP" == "missing" ]] && ALERTS+=("Missing CSP header — no content policy enforcement")
     [[ "$CORS" == "*" ]] && ALERTS+=("Permissive CORS: Access-Control-Allow-Origin is '*'")
+    [[ "$COOKIE_FLAGS" != "none" && "$COOKIE_FLAGS" != "0 weak" ]] && ALERTS+=("Cookies missing secure flags: $COOKIE_FLAGS")
+    [[ "$WAF_DETECTED" != "none" ]] && ALERTS+=("WAF/CDN detected: $WAF_DETECTED")
+
+    for path in ".env" ".git/config" "wp-config.php.bak" "index.php~" "config.php" "composer.lock" ".DS_Store"; do
+        CODE=$(get_json_value "secret_/$path" "$JSON")
+        [[ "$CODE" == "200" ]] && ALERTS+=("Exposed sensitive file: /$path (HTTP 200)")
+    done
 
     [[ ${#ALERTS[@]} -gt 0 ]] && {
-        echo "ALERTS (Security Scan) for host: $HOST"
+        [[ $USE_COLOR == true ]] && echo -e "${CYAN}ALERTS (Security Scan) for host: $HOST${RESET}" || echo "ALERTS (Security Scan) for host: $HOST"
         for alert in "${ALERTS[@]}"; do
-            echo "  - $alert"
+            [[ $USE_COLOR == true ]] && echo -e "  ${YELLOW}- $alert${RESET}" || echo "  - $alert"
         done
         echo
     }
 done
 
-echo "Alert scan complete."
-echo "==============================="
+[[ $USE_COLOR == true ]] && echo -e "${GREEN}Alert scan complete.${RESET}" || echo "Alert scan complete."
+[[ $USE_COLOR == true ]] && echo -e "${GREEN}===============================${RESET}" || echo "==============================="

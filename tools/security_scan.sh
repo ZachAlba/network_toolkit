@@ -158,6 +158,56 @@ else
     append_json "ssl_sig_weak" "false"
     append_csv "ssl_sig_weak" "false"
 fi
+# -------- Cookie Security --------
+
+append_txt "\n[+] Cookie Security Flags Check"
+COOKIE_HEADERS=$(curl -s -I "http://$HOST" | grep -i '^Set-Cookie:')
+
+if [ -z "$COOKIE_HEADERS" ]; then
+    append_txt "No Set-Cookie headers found."
+    append_json "cookie_flags" "none"
+    append_csv "cookie_flags" "none"
+else
+    WEAK_COOKIES=0
+    while read -r line; do
+        COOKIE_FLAGS=$(echo "$line" | tr '[:upper:]' '[:lower:]')
+        [[ "$COOKIE_FLAGS" != *"secure"* ]] && append_txt "Cookie missing Secure flag: $line" && WEAK_COOKIES=$((WEAK_COOKIES + 1))
+        [[ "$COOKIE_FLAGS" != *"httponly"* ]] && append_txt "Cookie missing HttpOnly flag: $line" && WEAK_COOKIES=$((WEAK_COOKIES + 1))
+        [[ "$COOKIE_FLAGS" != *"samesite"* ]] && append_txt "Cookie missing SameSite flag: $line" && WEAK_COOKIES=$((WEAK_COOKIES + 1))
+    done <<<"$COOKIE_HEADERS"
+
+    append_json "cookie_flags" "$WEAK_COOKIES weak"
+    append_csv "cookie_flags" "$WEAK_COOKIES weak"
+fi
+
+# -------- Exposed Secrets & Backup Files --------
+
+append_txt "\n[+] Secret and Backup File Exposure Check"
+SECRET_PATHS=("/.env" "/.git/config" "/wp-config.php.bak" "/index.php~" "/config.php" "/composer.lock" "/.DS_Store")
+for path in "${SECRET_PATHS[@]}"; do
+    CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://$HOST$path")
+    append_txt "$path: HTTP $CODE"
+    append_json "secret_$path" "$CODE"
+    append_csv "$path" "$CODE"
+done
+
+# -------- WAF Detection --------
+
+append_txt "\n[+] WAF/CDN Detection"
+HEADERS=$(curl -sI "http://$HOST")
+WAFS=("cloudflare" "sucuri" "imperva" "akamai" "incapsula")
+WAF_FOUND="none"
+
+for waf in "${WAFS[@]}"; do
+    if echo "$HEADERS" | grep -qi "$waf"; then
+        WAF_FOUND="$waf"
+        break
+    fi
+done
+
+append_txt "Detected WAF/CDN: $WAF_FOUND"
+append_json "waf_detected" "$WAF_FOUND"
+append_csv "waf_detected" "$WAF_FOUND"
 
 # -------- Output --------
 
