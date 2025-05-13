@@ -13,7 +13,7 @@ RESET='\033[0m'
 # Author: Zachary Albanese
 # =============================
 
-if ! command -v gum &> /dev/null; then
+if ! command -v gum &>/dev/null; then
   echo "gum is required but not installed. Install via: brew install gum OR manually from GitHub"
   exit 1
 fi
@@ -21,16 +21,23 @@ fi
 banner() {
   echo -e "${BGBLUE}${CYAN}"
   echo "╔═════════════════════════════════════════════════╗"
-  echo "║     🛠️  NETWORK DIAGNOSTIC TOOLKIT CLI MENU     ║"
+  echo "║     🛠️  NETWORK DIAGNOSTIC TOOLKIT CLI MENU      ║"
   echo "╚═════════════════════════════════════════════════╝"
   echo -e "${RESET}"
 }
 
 build_output_flag() {
   FORMAT="json"
-  EXTRA_FORMATS=$(gum choose --no-limit --cursor "👉" txt csv)
-  [[ "$EXTRA_FORMATS" == *"txt"* ]] && FORMAT="$FORMAT,txt"
-  [[ "$EXTRA_FORMATS" == *"csv"* ]] && FORMAT="$FORMAT,csv"
+
+  CHOICE=$(gum choose --cursor "👉" "json (default)" "txt" "csv" "all")
+
+  case "$CHOICE" in
+  "txt") FORMAT="json,txt" ;;
+  "csv") FORMAT="json,csv" ;;
+  "all") FORMAT="json,txt,csv" ;;
+  *) FORMAT="json" ;;
+  esac
+
   echo "$FORMAT"
 }
 
@@ -43,11 +50,13 @@ scan_host() {
   FORMAT=$(build_output_flag)
   START_TIME=$(date +%s)
 
-  if [[ "$TYPE" == "Diagnostics" ]]; then
-    bash tools/diagnostics.sh "$HOST" "--$FORMAT"
-  else
-    bash tools/security_scan.sh "$HOST" "--$FORMAT"
-  fi
+  gum spin --spinner dot --title "Running $TYPE scan on $HOST..." -- bash -c "
+    if [[ \"$TYPE\" == \"Diagnostics\" ]]; then
+      bash tools/diagnostics.sh \"$HOST\" \"--$FORMAT\"
+    else
+      bash tools/security_scan.sh \"$HOST\" \"--$FORMAT\"
+    fi
+  "
 
   END_TIME=$(date +%s)
   DURATION=$((END_TIME - START_TIME))
@@ -80,15 +89,16 @@ edit_config() {
   DAYS=$(gum input --placeholder "Log retention in days")
   EMAIL=$(gum input --placeholder "Admin email for alerts")
 
-  echo -e "[Targets]\nhosts = $HOSTS\n\n[Settings]\noutput_mode = $MODE\nlog_retention_days = $DAYS\n\n[Admin]\nadmin_email = $EMAIL" > config.ini
+  echo -e "[Targets]\nhosts = $HOSTS\n\n[Settings]\noutput_mode = $MODE\nlog_retention_days = $DAYS\n\n[Admin]\nadmin_email = $EMAIL" >config.ini
 
   echo -e "${GREEN}config.ini updated successfully.${RESET}"
 }
 
 main_menu() {
-  banner
 
   while true; do
+    clear
+    banner
     CHOICE=$(gum choose --cursor "👉" \
       "🔎 Scan a host" \
       "🗂  Batch scan (auto mode)" \
@@ -98,15 +108,15 @@ main_menu() {
       "❌ Exit")
 
     case "$CHOICE" in
-      "🔎 Scan a host") scan_host ;;
-      "🗂  Batch scan (auto mode)") batch_mode ;;
-      "📂 View recent logs") view_logs ;;
-      "🚨 View alerts") view_alerts ;;
-      "⚙️  Configure settings") edit_config ;;
-      "❌ Exit")
-        echo -e "${GREEN}Goodbye.${RESET}"
-        exit 0
-        ;;
+    "🔎 Scan a host") scan_host ;;
+    "🗂  Batch scan (auto mode)") batch_mode ;;
+    "📂 View recent logs") view_logs ;;
+    "🚨 View alerts") view_alerts ;;
+    "⚙️  Configure settings") edit_config ;;
+    "❌ Exit")
+      echo -e "${GREEN}Goodbye.${RESET}"
+      exit 0
+      ;;
     esac
   done
 }

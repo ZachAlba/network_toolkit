@@ -134,3 +134,12 @@ done
 
 [[ $USE_COLOR == true ]] && echo -e "${GREEN}Alert scan complete.${RESET}" || echo "Alert scan complete."
 [[ $USE_COLOR == true ]] && echo -e "${GREEN}===============================${RESET}" || echo "==============================="
+
+# Wait for user to acknowledge, then clear
+if command -v gum &>/dev/null; then
+    gum input --prompt "Press Enter to return to menu..." >/dev/null
+else
+    read -rp "Press Enter to return to menu..."
+fi
+
+clear

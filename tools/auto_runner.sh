@@ -33,6 +33,7 @@ echo
 for HOST in $(echo "$HOSTS" | tr ',' ' '); do
     echo "[*] Scanning $HOST..."
     bash "$(dirname "$0")/diagnostics.sh" "$HOST" "--$OUTPUT_MODE"
+    bash "$(dirname "$0")/security_scan.sh" "$HOST" "--$OUTPUT_MODE"
     echo
 done
 
